@@ -3,3 +3,4 @@
 - `susie_vs_fm.py` was used to compare the functional enrichment in putative eQTLs identified in SuSiE vs FINEMAP (Fig. S4)
 - `pip_ems_heatmap.py` was used to draw a heatmap that compares PIP using EMS as a prior vs uniform prior (Fig. 2a,b, File S1, 2)
 - `pip_ems_minmax100.py` was used to compare the constrained functional prior (max/min ratio < 100) (Fig. S16)
+- `ems_feat_imp.py` was used to investigate the feature importance of the features in the random forest model (Fig. S7, File S3)
