@@ -9,6 +9,8 @@ The code calls
 - `select_tissue_spec_bin_feat.py` which selects the ROADMAP functional features that will be used for the predictor, based on F1 measure etc, and 
 - `select_bas_feat.py` which selects Basenji features that will be used for the predictor, based on marginal ROC.
 
+`select_tissue_spec_bin_feat_downstream.py` and `select_bas_feat_downstream.py` were used to summarized the results across tissue types.
+
 `train_a_predictor_for_a_tissue.sh` (which calls `train_a_predictor.py`) was used to optimize the parameters in a random forest (RF) predictor that is used for building EMS by performing random and grid parameter search.
 
 `train_predictors_alltissues.sh` was used to run the code above for all 49 GTEx tissues.
