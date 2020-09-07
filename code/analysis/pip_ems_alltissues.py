@@ -7,7 +7,6 @@ hl.init(default_reference='GRCh38')
 import pandas as pd
 import numpy as np
 
-"""
 tissues = ["Whole_Blood", 
            "Muscle_Skeletal",
            "Liver",
@@ -57,14 +56,9 @@ tissues = ["Whole_Blood",
             "Small_Intestine_Terminal_Ileum",
             "Uterus",
             "Vagina"]#all 49 tissues
-"""
-tissues = ["Pancreas","Breast_Mammary_Tissue","Brain_Hypothalamus","Brain_Spinal_cord_cervical_c-1"]#pancriusで謎のerror. その上までは完了. Breastもなぞのerror Hippocampus Brain_Spinalも
-#まあいいかこいつらは無視して... leg's go to the next steps
-
-#tissue_name = "Whole_Blood"
 for tissue_name in tissues:
 
-    #get the pip_ems for all the tissues, and save
+    #get the alpha for each tissue
     alphas = hl.import_table("gs://gtex_finemapping/v8/munged/GTEx_{0}_alphas.tsv.gz".format(tissue_name),  force_bgz=True, impute=True).repartition(400)
     alphas.group_by("gene").aggregate(n = hl.agg.count()).export("gs://qingbowang/ems_v1_test/updated_pips/{0}_n_vars_per_gene_alpha.tsv".format(tissue_name))
 
@@ -74,16 +68,10 @@ for tissue_name in tissues:
     ng = hl.Table.from_pandas(ng).key_by("gene")
     alphas = hl.import_table("gs://gtex_finemapping/v8/munged/GTEx_{0}_alphas.tsv.gz".format(tissue_name),  force_bgz=True, impute=True).repartition(400)
     alphas.key_by("gene").join(ng, how="left").write("gs://qingbowang/ems_v1_test/updated_pips/GTEx_{0}_alphas_and_n_vars.ht".format(tissue_name), overwrite=True)
-
-
-
     ht = hl.read_table("gs://qingbowang/ems_v1_test/updated_pips/GTEx_{0}_alphas_and_n_vars.ht".format(tissue_name))
-    #ht.group_by("cs_id").aggregate(n = hl.agg.count()).export("gs://qingbowang/ems_v1_test/updated_pips/{0}_csid_cnt.tsv".format(tissue_name))
 
-    #for each gene, get the meaningful csid -- no need :
+    #for each gene, get the meaningful csid:
     ht.group_by("gene","cs_id").aggregate(n = hl.agg.count()).export("gs://qingbowang/ems_v1_test/updated_pips/{0}_csid_cnt_per_gene.tsv".format(tissue_name))
-
-
     fn = "gs://qingbowang/ems_v1_test/updated_pips/{0}_csid_cnt_per_gene.tsv".format(tissue_name)
     with hl.hadoop_open(fn, 'r') as f:
         df = pd.read_csv(f, sep="\t")
@@ -93,27 +81,11 @@ for tissue_name in tissues:
     l = l.rename(columns={'cs_id': 'csid_list'})
     ht = hl.Table.from_pandas(l).key_by("gene")
     ht.write("gs://qingbowang/ems_v1_test/updated_pips/{0}_csid_list_per_gene.ht".format(tissue_name), overwrite=True) #row = gene, column = csid list
-    #this is the csid list per gene
-
-
+  
 
     #and use that for pip_f update:
     alphas = hl.import_table("gs://gtex_finemapping/v8/munged/GTEx_{0}_alphas.tsv.gz".format(tissue_name),  force_bgz=True, impute=True).repartition(400)
     ems = hl.read_table("gs://qingbowang/ems_v1_test/ems_pcausal_gtexvg_all{0}.ht".format(tissue_name))
-
-    """
-    #alphaがたまにstrなので、直す (for those failied ones only)
-    alphas = alphas.annotate(alpha1=hl.cond(hl.str(alphas.alpha1)=="", hl.float64(0),hl.float64(alphas.alpha1)),
-                             alpha2=hl.cond(hl.str(alphas.alpha2) == "", hl.float64(0), hl.float64(alphas.alpha2)),
-                             alpha3=hl.cond(hl.str(alphas.alpha3) == "", hl.float64(0), hl.float64(alphas.alpha3)),
-                             alpha4=hl.cond(hl.str(alphas.alpha4) == "", hl.float64(0), hl.float64(alphas.alpha4)),
-                             alpha5=hl.cond(hl.str(alphas.alpha5) == "", hl.float64(0), hl.float64(alphas.alpha5)),
-                             alpha6=hl.cond(hl.str(alphas.alpha6) == "", hl.float64(0), hl.float64(alphas.alpha6)),
-                             alpha7=hl.cond(hl.str(alphas.alpha7) == "", hl.float64(0), hl.float64(alphas.alpha7)),
-                             alpha8=hl.cond(hl.str(alphas.alpha8) == "", hl.float64(0), hl.float64(alphas.alpha8)),
-                             alpha9=hl.cond(hl.str(alphas.alpha9) == "", hl.float64(0), hl.float64(alphas.alpha9)),
-                             alpha10=hl.cond(hl.str(alphas.alpha10) == "", hl.float64(0), hl.float64(alphas.alpha10)))
-    """
 
     #for imputing, retrieve the p-random (first 10000 should be basically enough. theoretically this is constant other than precision error)
     hthead = ems.head(10000)
@@ -157,20 +129,19 @@ for tissue_name in tissues:
                                                      sum_7=hl.agg.sum(alphas.alpha_7_times_ems),
                                                      sum_8=hl.agg.sum(alphas.alpha_8_times_ems),
                                                      sum_9=hl.agg.sum(alphas.alpha_9_times_ems),
-                                                     sum_10=hl.agg.sum(alphas.alpha_10_times_ems) #doesn't scale .. but fine for just 10 effects
+                                                     sum_10=hl.agg.sum(alphas.alpha_10_times_ems)
                                                      )
 
     alphas = alphas.key_by("gene").join(sums, how="left")
     alphas = alphas.join(sums_alpha, how="left")
-    #and divide by the sum, and multiply by the sum alpha, since we don't want to screw up when the sum of alpha is not 1
+    #and divide by the sum, and multiply by the sum alpha
     for i in range(len(colnames)):
         newname ="alpha_updated_{0}".format(i+1)
         alphas = alphas.annotate(tmp = alphas["alpha_{0}_times_ems".format(i+1)] / alphas["sum_{0}".format(i+1)] * alphas["sum_alpha_{0}".format(i+1)])
         alphas = alphas.rename({"tmp": newname})  # and rename as new alpha
-    #we just want the sum of unif_alpha to be the sum of updated_alpha.
 
     #then get the final updated pip by 1 - \prod{alphas}
-    #-> where, alpha = alpha_u when no signal, alpha_f only if the alpha (the csid) is meaningful
+    #where, alpha = alpha_u when no signal, alpha_f only if the alpha (the csid) is meaningful
 
     #to do so, first get the cs list
     csid = hl.read_table("gs://qingbowang/ems_v1_test/updated_pips/{0}_csid_list_per_gene.ht".format(tissue_name))
@@ -181,8 +152,7 @@ for tissue_name in tissues:
         alphas = alphas.annotate(tmp = hl.cond( alphas["csid_list"].contains(hl.int64(i+1)), alphas[newname], alphas["alpha{0}".format(i+1)]))
         alphas = alphas.drop(newname)
         alphas = alphas.rename({"tmp": newname})  # and rename as new alpha (this could be alpha_u or alpha_f depending on the cs, but mostly alpha_u this is)
-
-
+    #do the \prod
     alphas = alphas.annotate(prod = 1)
     for i in range(len(colnames)):
         newname = "alpha_updated_{0}".format(i+1)
