@@ -1,2 +1,3 @@
 - `pip_ems_alltissues.py` was used to calculate the functionally informed PIP using EMS as a prior
 - `rf_performance_comparison.py` was used to compare the performance of random forest classifier with different features or predictors (Fig. S19)
+- `susie_vs_fm.py` was used to compare the functional enrichment in putative eQTLs identified in SuSiE vs FINEMAP (Fig. S4)
