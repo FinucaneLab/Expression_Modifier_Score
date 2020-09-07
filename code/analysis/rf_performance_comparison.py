@@ -16,20 +16,13 @@ import glob
 from Bio.SeqUtils import MeltingTemp as mt
 from Bio.Seq import Seq
 
-
-#official figure for the performance comparison of EMS
-#to useだけに絞ってみるか....
-
-#do this in the VM. it's going to be large..
-"""in local
-gcloud beta compute instances create "rf-vm" --machine-type=n1-highcpu-96 --scopes=storage-rw
-gcloud beta compute --project "encode-uk-biobank" ssh --zone "us-central1-b" "rf-vm"
-gsutil cp /Users/qingbowang/PycharmProjects/python3projects/gtex_finemapping/ems_pipe_test_20200125/20200820_rf_performance_comparison.py gs://qingbowang/20200820_rf_performance_comparison.py ./
-
-
 """
-"""in vm
-#and run this inside the ssh:
+##done in local
+##gcloud beta compute instances create "rf-vm" --machine-type=n1-highcpu-96 --scopes=storage-rw
+##gcloud beta compute --project "encode-uk-biobank" ssh --zone "us-central1-b" "rf-vm"
+##gsutil cp /Users/qingbowang/PycharmProjects/python3projects/gtex_finemapping/ems_pipe_test_20200125/20200820_rf_performance_comparison.py gs://qingbowang/20200820_rf_performance_comparison.py ./
+
+##done in the VM:
 #load the package
 sudo apt-get install bzip2 libxml2-dev
 wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
@@ -67,9 +60,6 @@ gsutil cp gs://qingbowang/ems_v1_test/"$tissue_name"_negative_training_vg_roadma
 gsutil cp gs://qingbowang/ems_v1_test/"$tissue_name"_negative_training_vg_roadmapannot_H3K4me3.tsv ./
 gsutil cp gs://qingbowang/ems_v1_test/"$tissue_name"_negative_training_vg_roadmapannot_H3K9ac.tsv ./
 gsutil cp gs://qingbowang/ems_v1_test/"$tissue_name"_negative_training_vg_roadmapannot_H3K9me3.tsv ./
-
-
-
 """
 
 
@@ -94,7 +84,7 @@ neg = []
 posbas = pd.read_csv("{0}_positive_training_vg_annotated.tsv".format(tissue_name), sep="\t", index_col=0)
 negbas = pd.read_csv("{0}_negative_training_vg_annotated.tsv".format(tissue_name), sep="\t", index_col=0)
 posbas = posbas.loc[:,feat_to_use_bin + list(feat_to_use_bas) + feat_tss]
-negbas = negbas.loc[:,feat_to_use_bin + list(feat_to_use_bas) + feat_tss] #let's use the full features
+negbas = negbas.loc[:,feat_to_use_bin + list(feat_to_use_bas) + feat_tss]
 #and turn the log1p
 posbas = posbas.apply(lambda x: abs_log1p(x))
 negbas = negbas.apply(lambda x: abs_log1p(x))
@@ -162,7 +152,7 @@ for i in range(fold):
     y_real_all = y_real_all + list(y_test)
     y_prob_all = y_prob_all + list(y_prob)
     
-    #using TSS only (worked):
+    #using TSS only:
     regr.fit(np.array(X_train["tss_distance"]).reshape(-1, 1), y_train)
     y_prob = regr.predict_proba(np.array(X_test["tss_distance"]).reshape(-1, 1))
     y_prob = y_prob[:,1]
@@ -196,8 +186,8 @@ y_prob_all_rf_best = []
 y_prob_all_adab = []
 y_prob_all_gb = []
 
-#also time
-times = [] #それぞれ、first iterationだけ
+#also computation time, just for reference
+times = []
 
 for i in range(fold):
     np.random.seed(fold)
@@ -226,7 +216,7 @@ for i in range(fold):
     times.append(tm.time()-t1)
     y_prob = y_prob[:,1]
     y_prob_all_rf = y_prob_all_rf + list(y_prob)
-    #adaboost -- 長すぎ...
+    #adaboost
     regr = AdaBoostClassifier(random_state=1)
     t1 = tm.time()
     regr.fit(X_train, y_train)
@@ -234,7 +224,7 @@ for i in range(fold):
     times.append(tm.time() - t1)
     y_prob = y_prob[:,1]
     y_prob_all_adab = y_prob_all_adab + list(y_prob)
-    #gradient boost -- 多分長い.. けど頑張るしかないぽいな..
+    #gradient boost
     regr = GradientBoostingClassifier(random_state=1)
     t1 = tm.time()
     regr.fit(X_train, y_train)
@@ -286,22 +276,119 @@ df.to_csv("rf_evaluation_algorithms.tsv", sep="\t")
 df = pd.DataFrame({"1":times[:7], "2":times[7:7*2], "3":times[7*2:7*3], "4":times[7*3:7*4],"5": times[7*4:7*5], "6":times[7*5:7*6], "7":times[7*6:7*7], "8":times[7*7:7*8], "9":times[7*8:7*9], "10":times[7*9:7*10]})
 df.index = ["rf","adab","grad","logr","svm","bayes","knn"]
 df.to_csv("rf_evaluation_algorithms_times.tsv", sep="\t")
-#and in local:
-#no, in script
 import subprocess
 subprocess.call(["gsutil","cp","rf_evaluation_withinfeat.tsv","gs://qingbowang/"])
 subprocess.call(["gsutil","cp","rf_evaluation_algorithms.tsv","gs://qingbowang/"])
 subprocess.call(["gsutil","cp","rf_evaluation_algorithms_times.tsv","gs://qingbowang/"])
-# gsutil cp rf_evaluation_withinfeat.tsv gs://qingbowang/
-# gsutil cp rf_evaluation_algorithms.tsv gs://qingbowang/
-# gsutil cp rf_evaluation_algorithms_times.tsv gs://qingbowang/
 
 
-#その前にこっちでも軽くrocを確認しようか: いやいいや面倒
-#もしこれでrfがいい感じじゃなかったらfeature削った後で比べる
-fpr, tpr, threshold = metrics.roc_curve(y_real_all, y_prob_all)
+##and then draw the curves (run in cloud):
+from sklearn.linear_model import LogisticRegression
+from sklearn import svm
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.metrics import precision_recall_curve, auc, average_precision_score
+from sklearn import metrics
+
+fn = "gs://qingbowang/rf_evaluation_withinfeat.tsv"
+with hl.hadoop_open(fn, 'r') as f:
+    df = pd.read_csv(f, sep="\t")
+fn = "gs://qingbowang/rf_evaluation_algorithms.tsv"
+with hl.hadoop_open(fn, 'r') as f:
+    df2 = pd.read_csv(f, sep="\t")
+
+#draw roc:
+fpr, tpr, threshold = metrics.roc_curve(df.label, df.full)
 roc_auc = metrics.auc(fpr, tpr)
+plt.plot(fpr, tpr, color='r', label = 'All features, AUROC = %0.4f' % roc_auc)
+fpr, tpr, threshold = metrics.roc_curve(df.label, df.tss)
+roc_auc = metrics.auc(fpr, tpr)
+plt.plot(fpr, tpr, color='g', label = 'TSS only, AUROC = %0.4f' % roc_auc)
+fpr, tpr, threshold = metrics.roc_curve(df.label, df.bas)
+roc_auc = metrics.auc(fpr, tpr)
+plt.plot(fpr, tpr, color='b', label = 'Basenji features only, AUROC = %0.4f' % roc_auc)
+fpr, tpr, threshold = metrics.roc_curve(df.label, df["bin"])
+roc_auc = metrics.auc(fpr, tpr)
+plt.plot(fpr, tpr, color='black', label = 'Binary features only, AUROC = %0.4f' % roc_auc)
+plt.legend()
 
-#localかnotebookどっちでもいいので明日やる
+fpr, tpr, threshold = metrics.roc_curve(df2.label, df2["rf, tuned"])
+roc_auc = metrics.auc(fpr, tpr)
+plt.plot(fpr, tpr, color='tab:olive', label = 'Random forest, tuned = %0.4f' % roc_auc)
+fpr, tpr, threshold = metrics.roc_curve(df2.label, df2.rf)
+roc_auc = metrics.auc(fpr, tpr)
+plt.plot(fpr, tpr, color='tab:red', label = 'Random forest = %0.4f' % roc_auc)
+fpr, tpr, threshold = metrics.roc_curve(df2.label, df2.adab)
+roc_auc = metrics.auc(fpr, tpr)
+plt.plot(fpr, tpr, color='tab:green', label = 'Adaboost, AUROC = %0.4f' % roc_auc)
+fpr, tpr, threshold = metrics.roc_curve(df2.label, df2.grad)
+roc_auc = metrics.auc(fpr, tpr)
+plt.plot(fpr, tpr, color='tab:blue', label = 'Gradient boost, AUROC = %0.4f' % roc_auc)
+fpr, tpr, threshold = metrics.roc_curve(df2.label, df2.logr)
+roc_auc = metrics.auc(fpr, tpr)
+plt.plot(fpr, tpr, color='tab:orange', label = 'Logistic regression, AUROC = %0.4f' % roc_auc)
+fpr, tpr, threshold = metrics.roc_curve(df2.label, df2.svm)
+roc_auc = metrics.auc(fpr, tpr)
+plt.plot(fpr, tpr, color='tab:purple', label = 'SVM, AUROC = %0.4f' % roc_auc)
+fpr, tpr, threshold = metrics.roc_curve(df2.label, df2.bayes)
+roc_auc = metrics.auc(fpr, tpr)
+plt.plot(fpr, tpr, color='tab:brown', label = 'Naive Bayes, AUROC = %0.4f' % roc_auc)
+fpr, tpr, threshold = metrics.roc_curve(df2.label, df2.knn)
+roc_auc = metrics.auc(fpr, tpr)
+plt.plot(fpr, tpr, color='tab:gray', label = 'KNN, AUROC = %0.4f' % roc_auc)
+plt.legend()
 
-
+#prc
+from sklearn.metrics import precision_recall_curve
+precision, recall, _ = precision_recall_curve(df2.label, df2["rf, tuned"])
+prc_auc = metrics.average_precision_score(df2.label, df2["rf, tuned"])
+plt.plot(recall, precision, color='tab:olive', label = 'Random forest, tuned = %0.4f' % prc_auc)
+precision, recall, _ = precision_recall_curve(df2.label, df2.rf)
+prc_auc = metrics.average_precision_score(df2.label, df2.rf)
+plt.plot(recall, precision, color='tab:red', label = 'Random forest = %0.4f' % prc_auc)
+precision, recall, _ = precision_recall_curve(df2.label, df2.adab)
+prc_auc = metrics.average_precision_score(df2.label, df2.adab)
+plt.plot(recall, precision, color='tab:green', label = 'Adaboost, AUROC = %0.4f' % prc_auc)
+precision, recall, _ = precision_recall_curve(df2.label, df2.grad)
+prc_auc = metrics.average_precision_score(df2.label, df2.grad)
+plt.plot(recall, precision, color='tab:blue', label = 'Gradient boost, AUROC = %0.4f' % prc_auc)
+precision, recall, _ = precision_recall_curve(df2.label, df2.logr)
+prc_auc = metrics.average_precision_score(df2.label, df2.logr)
+plt.plot(recall, precision, color='tab:orange', label = 'Logistic regression, AUROC = %0.4f' % prc_auc)
+precision, recall, _ = precision_recall_curve(df2.label, df2.svm)
+prc_auc = metrics.average_precision_score(df2.label, df2.svm)
+plt.plot(recall, precision, color='tab:purple', label = 'SVM, AUROC = %0.4f' % prc_auc)
+precision, recall, _ = precision_recall_curve(df2.label, df2.bayes)
+prc_auc = metrics.average_precision_score(df2.label, df2.bayes)
+plt.plot(recall, precision, color='tab:brown', label = 'Naive Bayes, AUROC = %0.4f' % prc_auc)
+precision, recall, _ = precision_recall_curve(df2.label, df2.knn)
+prc_auc = metrics.average_precision_score(df2.label, df2.knn)
+plt.plot(recall, precision, color='tab:gray', label = 'KNN, AUROC = %0.4f' % prc_auc)
+plt.legend()
+precision, recall, _ = precision_recall_curve(df2.label, df2["rf, tuned"])
+prc_auc = metrics.average_precision_score(df2.label, df2["rf, tuned"])
+plt.plot(recall, precision, color='tab:olive', label = 'Random forest, tuned, AUC = %0.4f' % prc_auc)
+precision, recall, _ = precision_recall_curve(df2.label, df2.rf)
+prc_auc = metrics.average_precision_score(df2.label, df2.rf)
+plt.plot(recall, precision, color='tab:red', label = 'Random forest, AUC = %0.4f' % prc_auc)
+precision, recall, _ = precision_recall_curve(df2.label, df2.adab)
+prc_auc = metrics.average_precision_score(df2.label, df2.adab)
+plt.plot(recall, precision, color='tab:green', label = 'Adaboost, AUC = %0.4f' % prc_auc)
+precision, recall, _ = precision_recall_curve(df2.label, df2.grad)
+prc_auc = metrics.average_precision_score(df2.label, df2.grad)
+plt.plot(recall, precision, color='tab:blue', label = 'Gradient boost, AUC = %0.4f' % prc_auc)
+precision, recall, _ = precision_recall_curve(df2.label, df2.logr)
+prc_auc = metrics.average_precision_score(df2.label, df2.logr)
+plt.plot(recall, precision, color='tab:orange', label = 'Logistic regression, AUC = %0.4f' % prc_auc)
+precision, recall, _ = precision_recall_curve(df2.label, df2.svm)
+prc_auc = metrics.average_precision_score(df2.label, df2.svm)
+plt.plot(recall, precision, color='tab:purple', label = 'SVM, AUROC = %0.4f' % prc_auc)
+precision, recall, _ = precision_recall_curve(df2.label, df2.bayes)
+prc_auc = metrics.average_precision_score(df2.label, df2.bayes)
+plt.plot(recall, precision, color='tab:brown', label = 'Naive Bayes, AUC = %0.4f' % prc_auc)
+precision, recall, _ = precision_recall_curve(df2.label, df2.knn)
+prc_auc = metrics.average_precision_score(df2.label, df2.knn)
+plt.plot(recall, precision, color='tab:gray', label = 'KNN, AUC = %0.4f' % prc_auc)
+plt.legend()
