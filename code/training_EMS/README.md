@@ -15,4 +15,4 @@ The code calls
 
 `train_predictors_alltissues_downstream.sh`, (which calls `train_a_predictor_downstream.py` for all tissues) was used to train the predictor with optimized parameter.
 
-Finally, `output_features_to_use_ordered.py` was used to format the files so that they can be streamlined for the downstream processes (e.g. scoring all the GTEx variants using the RF)
+Finally, `output_features_to_use_ordered.py` and `interpolate_p_causal.py` were used to format the files so that they can be streamlined for the downstream processes (e.g. scoring all the GTEx variants using the RF)
