@@ -10,3 +10,4 @@
 - `enrichments_ukbb_alltissues.py` was used for quantifying the enrichment of EMS in different traits (Fig. S22)
 - `locuszoom.py` was used for visualization of EMS around WSB1 gene (Fig. 2C, S11)
 - `basenji_effect_size.py` was used to quantify the enrichment of Basenji scores for different eQTL effect size bin (Fig. S18)
+- `ems_overview.py` was used to investigate the quantify the EMS for different distance to TSS, minor allele count, and marginal association p-value bins (Fig. S17)
