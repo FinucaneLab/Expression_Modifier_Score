@@ -5,3 +5,4 @@
 - `pip_ems_minmax100.py` was used to compare the constrained functional prior (max/min ratio < 100) (Fig. S16)
 - `ems_feat_imp.py` was used to investigate the feature importance of the features in the random forest model (Fig. S7, File S3)
 - `enrichments_agg.py` and `enrichments_plot.py` are used for enrichment analysis of functional features and the EMS (Fig. S3, 5, 15)
+- `mpra_uwash.py` was used for MPRA saturation mutagenesis data analysis
