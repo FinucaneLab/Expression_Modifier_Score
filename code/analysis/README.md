@@ -13,3 +13,4 @@
 - `ems_overview.py` was used to investigate the quantify the EMS for different distance to TSS, minor allele count, and marginal association p-value bins (Fig. S17)
 - `ems_qc.py` plots the feature importances and score conversions in the random forest predictor (Fig. S13, S14)
 - `ems_causal_var_enrichements.py` was used to quantify the enrichment of EMS and other major scores in putative causal eQTLs and putative complex trait-causal variants (Fig. 1b, S9)
+- `ems_auc_prc.py` was used to draw AUC/PRC for EMS and other major scores in prioritizing GTEx eQTLs (Fig. 1a, S8). Author: Shuvom Sadhuka. 
