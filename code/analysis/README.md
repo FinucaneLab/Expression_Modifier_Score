@@ -11,3 +11,4 @@
 - `locuszoom.py` was used for visualization of EMS around WSB1 gene (Fig. 2C, S11)
 - `basenji_effect_size.py` was used to quantify the enrichment of Basenji scores for different eQTL effect size bin (Fig. S18)
 - `ems_overview.py` was used to investigate the quantify the EMS for different distance to TSS, minor allele count, and marginal association p-value bins (Fig. S17)
+- `ems_qc.py` plots the feature importances and score conversions in the random forest predictor (Fig. S13, S14)
