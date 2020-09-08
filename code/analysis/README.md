@@ -14,3 +14,4 @@
 - `ems_qc.py` plots the feature importances and score conversions in the random forest predictor (Fig. S13, S14)
 - `ems_causal_var_enrichements.py` was used to quantify the enrichment of EMS and other major scores in putative causal eQTLs and putative complex trait-causal variants (Fig. 1b, S9)
 - `ems_auc_prc.py` was used to draw AUC/PRC for EMS and other major scores in prioritizing GTEx eQTLs (Fig. 1a, S8). Author: Shuvom Sadhuka. 
+- `pip_ems_validation.py` was used for validation of PIP_EMS using SuRE data and UKBB fine-mapping data (Fig. 2d, S20)
