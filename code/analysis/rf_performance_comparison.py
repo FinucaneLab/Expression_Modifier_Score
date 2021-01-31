@@ -110,7 +110,7 @@ pos.fillna(0, inplace=True)
 neg.fillna(0, inplace=True)
 pos.replace([np.inf, -np.inf], 0, inplace=True)
 neg.replace([np.inf, -np.inf], 0, inplace=True)
-#and to float (というかto floatだけすればOKぽい..)
+#and to float 
 pos = pos.astype(np.float32)
 neg = neg.astype(np.float32)
 
@@ -135,6 +135,9 @@ y_prob_all = []
 y_prob_tss = []
 y_prob_bin = []
 y_prob_bas = []
+y_prob_notss = [] #features other than tss
+y_prob_nobin = [] #features other than binary
+y_prob_nobas = [] #features other than basenji
 for i in range(fold):
     np.random.seed(fold)
     train_pos = np.random.choice(2, pos.shape[0], p=[frac_test, 1-frac_test])
@@ -163,15 +166,37 @@ for i in range(fold):
     y_prob = regr.predict_proba(X_test[list(feat_to_use_bin) + list(feat_to_use_rm)].fillna(0))
     y_prob = y_prob[:,1]
     y_prob_bin = y_prob_bin + list(y_prob)
-    #using bas only (worked):
+    
+    #using bas only:
     regr.fit(X_train[feat_to_use_bas], y_train)
     y_prob = regr.predict_proba(X_test[feat_to_use_bas])
     y_prob = y_prob[:,1]
     y_prob_bas = y_prob_bas + list(y_prob)
+    
+    # excluding TSS only
+    regr.fit(X_train[list(feat_to_use_bin) + list(feat_to_use_rm) + list(feat_to_use_bas)].fillna(0), y_train)
+    y_prob = regr.predict_proba(X_test[list(feat_to_use_bin) + list(feat_to_use_rm) + list(feat_to_use_bas)].fillna(0))
+    y_prob = y_prob[:, 1]
+    y_prob_notss = y_prob_notss + list(y_prob)
+
+    # excluding bin only
+    regr.fit(X_train[["tss_distance"] + list(feat_to_use_bas)].fillna(0), y_train)
+    y_prob = regr.predict_proba(X_test[["tss_distance"] + list(feat_to_use_bas)].fillna(0))
+    y_prob = y_prob[:, 1]
+    y_prob_nobin = y_prob_nobin + list(y_prob)
+
+    # excluding bas only
+    regr.fit(X_train[["tss_distance"] + list(feat_to_use_bin) + list(feat_to_use_rm)].fillna(0), y_train)
+    y_prob = regr.predict_proba(X_test[["tss_distance"] + list(feat_to_use_bin) + list(feat_to_use_rm)].fillna(0))
+    y_prob = y_prob[:, 1]
+    y_prob_nobas = y_prob_nobas + list(y_prob)
+    
 
 #output as df:
-df = pd.DataFrame({"label":y_real_all,"full":y_prob_all, "bin":y_prob_bin, "bas":y_prob_bas, "tss":y_prob_tss})
-df.to_csv("rf_evaluation_withinfeat.tsv", sep="\t")
+df = pd.DataFrame({"label": y_real_all, "full": y_prob_all,
+                   "bin": y_prob_bin, "bas": y_prob_bas, "tss": y_prob_tss,
+                   "nobin": y_prob_nobin, "nobas": y_prob_nobas, "notss": y_prob_notss})
+df.to_csv("rf_evaluation_withinfeat_updated.tsv", sep="\t") #updated to include "excluding one feature type" 2021/01/30
 
 
 
@@ -312,6 +337,15 @@ plt.plot(fpr, tpr, color='b', label = 'Basenji features only, AUROC = %0.4f' % r
 fpr, tpr, threshold = metrics.roc_curve(df.label, df["bin"])
 roc_auc = metrics.auc(fpr, tpr)
 plt.plot(fpr, tpr, color='black', label = 'Binary features only, AUROC = %0.4f' % roc_auc)
+fpr, tpr, threshold = metrics.roc_curve(df.label, df.notss)
+roc_auc = metrics.auc(fpr, tpr)
+plt.plot(fpr, tpr, color='g', label = 'w/o TSS, AUROC = %0.4f' % roc_auc, linestyle="--")
+fpr, tpr, threshold = metrics.roc_curve(df.label, df.nobas)
+roc_auc = metrics.auc(fpr, tpr)
+plt.plot(fpr, tpr, color='b', label = 'w/o Basenji features, AUROC = %0.4f' % roc_auc, linestyle="--")
+fpr, tpr, threshold = metrics.roc_curve(df.label, df.nobin)
+roc_auc = metrics.auc(fpr, tpr)
+plt.plot(fpr, tpr, color='black', label = 'w/o Binary features, AUROC = %0.4f' % roc_auc, linestyle="--")
 plt.legend()
 
 fpr, tpr, threshold = metrics.roc_curve(df2.label, df2["rf, tuned"])
@@ -342,31 +376,31 @@ plt.legend()
 
 #prc
 from sklearn.metrics import precision_recall_curve
-precision, recall, _ = precision_recall_curve(df2.label, df2["rf, tuned"])
-prc_auc = metrics.average_precision_score(df2.label, df2["rf, tuned"])
-plt.plot(recall, precision, color='tab:olive', label = 'Random forest, tuned = %0.4f' % prc_auc)
-precision, recall, _ = precision_recall_curve(df2.label, df2.rf)
-prc_auc = metrics.average_precision_score(df2.label, df2.rf)
-plt.plot(recall, precision, color='tab:red', label = 'Random forest = %0.4f' % prc_auc)
-precision, recall, _ = precision_recall_curve(df2.label, df2.adab)
-prc_auc = metrics.average_precision_score(df2.label, df2.adab)
-plt.plot(recall, precision, color='tab:green', label = 'Adaboost, AUROC = %0.4f' % prc_auc)
-precision, recall, _ = precision_recall_curve(df2.label, df2.grad)
-prc_auc = metrics.average_precision_score(df2.label, df2.grad)
-plt.plot(recall, precision, color='tab:blue', label = 'Gradient boost, AUROC = %0.4f' % prc_auc)
-precision, recall, _ = precision_recall_curve(df2.label, df2.logr)
-prc_auc = metrics.average_precision_score(df2.label, df2.logr)
-plt.plot(recall, precision, color='tab:orange', label = 'Logistic regression, AUROC = %0.4f' % prc_auc)
-precision, recall, _ = precision_recall_curve(df2.label, df2.svm)
-prc_auc = metrics.average_precision_score(df2.label, df2.svm)
-plt.plot(recall, precision, color='tab:purple', label = 'SVM, AUROC = %0.4f' % prc_auc)
-precision, recall, _ = precision_recall_curve(df2.label, df2.bayes)
-prc_auc = metrics.average_precision_score(df2.label, df2.bayes)
-plt.plot(recall, precision, color='tab:brown', label = 'Naive Bayes, AUROC = %0.4f' % prc_auc)
-precision, recall, _ = precision_recall_curve(df2.label, df2.knn)
-prc_auc = metrics.average_precision_score(df2.label, df2.knn)
-plt.plot(recall, precision, color='tab:gray', label = 'KNN, AUROC = %0.4f' % prc_auc)
+
+precision, recall, _ = precision_recall_curve(df.label, df.full)
+prc_auc = metrics.average_precision_score(df.label, df.full)
+plt.plot(recall, precision, color='r', label = 'All features, AUC = %0.4f' % roc_auc)
+precision, recall, _ = precision_recall_curve(df.label, df.tss)
+prc_auc = metrics.average_precision_score(df.label, df.tss)
+plt.plot(recall, precision, color='g', label = 'TSS only, AUC = %0.4f' % roc_auc)
+precision, recall, _ = precision_recall_curve(df.label, df.bas)
+prc_auc = metrics.average_precision_score(df.label, df.bas)
+plt.plot(recall, precision, color='b', label = 'Basenji features only, AUC = %0.4f' % roc_auc)
+precision, recall, _ = precision_recall_curve(df.label, df["bin"])
+prc_auc = metrics.average_precision_score(df.label, df["bin"])
+plt.plot(recall, precision, color='black', label = 'Binary features only, AUC = %0.4f' % roc_auc)
+precision, recall, _ = precision_recall_curve(df.label, df.notss)
+prc_auc = metrics.average_precision_score(df.label, df.notss)
+plt.plot(recall, precision, color='g', label = 'w/o TSS, AUC = %0.4f' % roc_auc, linestyle="--")
+precision, recall, _ = precision_recall_curve(df.label, df.nobas)
+prc_auc = metrics.average_precision_score(df.label, df.nobas)
+plt.plot(recall, precision, color='b', label = 'w/o Basenji features, AUC = %0.4f' % roc_auc, linestyle="--")
+precision, recall, _ = precision_recall_curve(df.label, df.nobin)
+prc_auc = metrics.average_precision_score(df.label, df.nobin)
+plt.plot(recall, precision, color='black', label = 'w/o Binary features, AUC = %0.4f' % roc_auc, linestyle="--")
 plt.legend()
+
+
 precision, recall, _ = precision_recall_curve(df2.label, df2["rf, tuned"])
 prc_auc = metrics.average_precision_score(df2.label, df2["rf, tuned"])
 plt.plot(recall, precision, color='tab:olive', label = 'Random forest, tuned, AUC = %0.4f' % prc_auc)
@@ -384,7 +418,7 @@ prc_auc = metrics.average_precision_score(df2.label, df2.logr)
 plt.plot(recall, precision, color='tab:orange', label = 'Logistic regression, AUC = %0.4f' % prc_auc)
 precision, recall, _ = precision_recall_curve(df2.label, df2.svm)
 prc_auc = metrics.average_precision_score(df2.label, df2.svm)
-plt.plot(recall, precision, color='tab:purple', label = 'SVM, AUROC = %0.4f' % prc_auc)
+plt.plot(recall, precision, color='tab:purple', label = 'SVM, AUC = %0.4f' % prc_auc)
 precision, recall, _ = precision_recall_curve(df2.label, df2.bayes)
 prc_auc = metrics.average_precision_score(df2.label, df2.bayes)
 plt.plot(recall, precision, color='tab:brown', label = 'Naive Bayes, AUC = %0.4f' % prc_auc)
